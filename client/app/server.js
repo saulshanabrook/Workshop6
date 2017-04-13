@@ -143,14 +143,10 @@ export function postComment(feedItemId, author, contents, cb) {
  * Provides an updated likeCounter in the response.
  */
 export function likeFeedItem(feedItemId, userId, cb) {
-  var feedItem = readDocument('feedItems', feedItemId);
-  // Normally, we would check if the user already liked this comment.
-  // But we will not do that in this mock server.
-  // ('push' modifies the array by adding userId to the end)
-  feedItem.likeCounter.push(userId);
-  writeDocument('feedItems', feedItem);
-  // Return a resolved version of the likeCounter
-  emulateServerReturn(feedItem.likeCounter.map((userId) => readDocument('users', userId)), cb);
+  sendXHR('PUT', '/feeditem/' + feedItemId + '/likelist/' + userId,
+          undefined, (xhr) => {
+    cb(JSON.parse(xhr.responseText));
+  });
 }
 
 /**
@@ -204,32 +200,19 @@ export function unlikeComment(feedItemId, commentIdx, userId, cb) {
  * Updates the text in a feed item (assumes a status update)
  */
 export function updateFeedItemText(feedItemId, newContent, cb) {
-  var feedItem = readDocument('feedItems', feedItemId);
-  // Update text content of update.
-  feedItem.contents.contents = newContent;
-  writeDocument('feedItems', feedItem);
-  emulateServerReturn(getFeedItemSync(feedItemId), cb);
+  sendXHR('PUT', '/feeditem/' + feedItemId + '/content', newContent, (xhr) => {
+    cb(JSON.parse(xhr.responseText));
+  });
 }
 
 /**
  * Deletes a feed item.
  */
 export function deleteFeedItem(feedItemId, cb) {
-  // Assumption: The current user authored this feed item.
-  deleteDocument('feedItems', feedItemId);
-  // Remove references to this feed item from all other feeds.
-  var feeds = getCollection('feeds');
-  var feedIds = Object.keys(feeds);
-  feedIds.forEach((feedId) => {
-    var feed = feeds[feedId];
-    var itemIdx = feed.contents.indexOf(feedItemId);
-    if (itemIdx !== -1) {
-      // Splice out of array.
-      feed.contents.splice(itemIdx, 1);
-      // Update feed.
-      writeDocument('feeds', feed);
-    }
+  sendXHR('DELETE', '/feeditem/' + feedItemId, undefined, () => {
+    cb();
   });
+}
 
   // Return nothing. The return just tells the client that
   // the server has acknowledged the request, and that it has
